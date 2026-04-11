@@ -41,12 +41,13 @@ DB_CONFIG = {
 }
 
 
-def load_model():
+def load_model(tag: str = None):
     """Load the trained model, vectorizer, and label names."""
-    print("Loading model...")
-    vectorizer = joblib.load(MODEL_DIR / "tfidf_vectorizer.pkl")
-    model = joblib.load(MODEL_DIR / "logreg_model.pkl")
-    label_names = joblib.load(MODEL_DIR / "label_names.pkl")
+    suffix = f"_{tag}" if tag else ""
+    print(f"Loading model{f' ({tag})' if tag else ''}...")
+    vectorizer = joblib.load(MODEL_DIR / f"tfidf_vectorizer{suffix}.pkl")
+    model = joblib.load(MODEL_DIR / f"logreg_model{suffix}.pkl")
+    label_names = joblib.load(MODEL_DIR / f"label_names{suffix}.pkl")
     print(f"  Model loaded. Categories: {label_names}")
     return vectorizer, model, label_names
 
@@ -123,13 +124,15 @@ def main():
                         help="Output CSV (default: output/categorized_transactions.csv)")
     parser.add_argument("--no-db", action="store_true",
                         help="Skip PostgreSQL, only write CSV")
+    parser.add_argument("--tag", type=str, default=None,
+                        help="Model tag to load (e.g. '2m', '100k')")
     args = parser.parse_args()
 
     input_file = Path(args.input) if args.input else PROJECT_ROOT / "data" / "synthetic_transactions.csv"
     output_file = Path(args.output) if args.output else OUTPUT_DIR / "categorized_transactions.csv"
 
     # load model
-    vectorizer, model, label_names = load_model()
+    vectorizer, model, label_names = load_model(args.tag)
 
     # load transactions
     with open(input_file, newline="") as f:

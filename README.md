@@ -43,7 +43,7 @@ finance-tracker/
 │   ├── seed_transactions.csv     # 1,252 LLM-generated seed descriptions
 │   ├── synthetic_transactions.csv # 25 test transactions
 │   ├── training_data.csv         # 100K simulated records (generated)
-│   └── scale_test.csv            # 2M simulated records (generated)
+│   └── large_training_data.csv            # 2M simulated records (generated)
 │
 ├── scripts/
 │   ├── generate_seeds.py         # generates seed descriptions using Groq
@@ -159,7 +159,7 @@ Samples from seeds and applies mutations (store number swaps, location suffixes,
 python scripts/simulator.py --records 100000
 
 # 2M records
-python scripts/simulator.py --records 2000000 --output data/scale_test.csv
+python scripts/simulator.py --records 2000000 --output data/large_training_data.csv
 ```
 
 Output: `data/training_data.csv`
@@ -173,7 +173,7 @@ Trains XGBoost and Logistic Regression with TF-IDF features.
 python scripts/train.py --tag 100k
 
 # Train on 2M
-python scripts/train.py --data data/scale_test.csv --tag 2m
+python scripts/train.py --data data/large_training_data.csv --tag 2m
 ```
 
 Output: `models/saved/*.pkl`
