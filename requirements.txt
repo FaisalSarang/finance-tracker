@@ -1,0 +1,11 @@
+python-dotenv
+requests
+psycopg2-binary
+scikit-learn
+xgboost
+pandas
+matplotlib
+seaborn
+joblib
+streamlit
+plotly
