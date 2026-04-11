@@ -1,0 +1,15 @@
+# environment
+.env
+venv/
+__pycache__/
+
+# models (too large for git)
+models/saved/*.pkl
+
+# generated data (too large)
+data/training_data.csv
+data/scale_test.csv
+
+# output files
+output/
+*.pyc
