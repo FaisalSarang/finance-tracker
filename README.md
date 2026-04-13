@@ -2,7 +2,7 @@
 
 **CS5100 — Foundations of Artificial Intelligence | Final Project**
 
-An intelligent transaction categorization system that compares three AI approaches: trained ML classifiers, XGBoost, and LLM prompt engineering. Includes a conversational chatbot for querying spending data in natural language.
+An intelligent personal finance application that uses trained ML classifiers to automatically categorize bank transactions, provides interactive spending analytics, and includes an AI chatbot for natural-language financial queries. The project compares three AI approaches: TF-IDF + Logistic Regression, XGBoost, and LLM prompt engineering (Ollama).
 
 **Team:** Faisal Riyaz Sarang, Juan Franco Boeta, Tridev Prabhu
 
@@ -20,12 +20,27 @@ Evaluated on the same 19,416-record test set. The trained Logistic Regression cl
 
 ---
 
-## Project Architecture
+## Application Architecture
 
 ```
-CSV Upload → Trained Model (categorization) → PostgreSQL (storage) → Power BI (dashboard)
-                                                    ↓
-                                            Streamlit Chatbot (Ollama)
+                   ┌─────────────────────────────────────────────┐
+                   │           Next.js 16 Frontend               │
+                   │  Dashboard · Transactions · Analytics       │
+                   │  Budgets · Add Transaction · AI Chat        │
+                   └──────────────────┬──────────────────────────┘
+                                      │  REST API
+                   ┌──────────────────▼──────────────────────────┐
+                   │           FastAPI Backend                    │
+                   │  ┌─────────┐ ┌──────────┐ ┌─────────────┐  │
+                   │  │ ML Svc  │ │ DB Svc   │ │ Ollama Svc  │  │
+                   │  │ TF-IDF  │ │ asyncpg  │ │ llama3.1:8b │  │
+                   │  └────┬────┘ └────┬─────┘ └──────┬──────┘  │
+                   └───────┼──────────┼───────────────┼──────────┘
+                           │          │               │
+                    ┌──────▼──┐  ┌────▼─────┐  ┌─────▼──────┐
+                    │ .pkl    │  │PostgreSQL│  │  Ollama    │
+                    │ models  │  │          │  │  (local)   │
+                    └─────────┘  └──────────┘  └────────────┘
 ```
 
 ---
@@ -34,37 +49,83 @@ CSV Upload → Trained Model (categorization) → PostgreSQL (storage) → Power
 
 ```
 finance-tracker/
-├── .env                          # API keys and database credentials (not in git)
+├── .env.example                      # Environment variable template
 ├── .gitignore
-├── requirements.txt
+├── requirements.txt                  # All Python dependencies
 ├── README.md
 │
-├── data/
-│   ├── seed_transactions.csv     # 1,252 LLM-generated seed descriptions
-│   ├── synthetic_transactions.csv # 25 test transactions
-│   ├── training_data.csv         # 100K simulated records (generated)
-│   └── large_training_data.csv            # 2M simulated records (generated)
+├── backend/                          # FastAPI REST API
+│   ├── main.py                       # App entry point, lifespan, CORS
+│   ├── config.py                     # Settings from .env
+│   ├── database.py                   # asyncpg connection pool
+│   ├── requirements.txt              # Backend-only dependencies
+│   ├── models/
+│   │   └── schemas.py                # Pydantic request/response models
+│   ├── routes/
+│   │   ├── transactions.py           # CRUD /api/transactions
+│   │   ├── upload.py                 # CSV upload with auto-categorization
+│   │   ├── categorize.py             # Single-description ML categorize
+│   │   ├── stats.py                  # /api/stats, /api/analytics/*
+│   │   ├── budgets.py                # /api/budgets CRUD
+│   │   └── chat.py                   # /api/chat (Ollama)
+│   └── services/
+│       ├── ml_service.py             # TF-IDF + LogReg model loading
+│       ├── db_service.py             # All database queries
+│       ├── ollama_service.py         # Ollama LLM client
+│       └── context_builder.py        # Builds spending context for chatbot
 │
-├── scripts/
-│   ├── generate_seeds.py         # generates seed descriptions using Groq
-│   ├── simulator.py              # scales seeds to training datasets
-│   ├── train.py                  # trains XGBoost + Logistic Regression
-│   ├── evaluate.py               # three-way model comparison
-│   ├── categorize.py             # production categorization pipeline
-│   └── test_models.py            # interactive model testing
+├── frontend/                         # Next.js 16 + TailwindCSS v4
+│   ├── package.json
+│   ├── src/
+│   │   ├── app/                      # App Router pages
+│   │   │   ├── page.tsx              # Dashboard
+│   │   │   ├── layout.tsx            # Root layout (sidebar, slicers)
+│   │   │   ├── globals.css           # Obsidian Mint design system
+│   │   │   ├── transactions/         # Transaction list with search/sort
+│   │   │   ├── add/                  # Manual entry + CSV drag-drop upload
+│   │   │   ├── analytics/            # Category donut + monthly trends
+│   │   │   ├── budgets/              # Budget management
+│   │   │   └── chat/                 # Full-page AI chatbot
+│   │   ├── components/
+│   │   │   ├── ui/                   # Card, Badge, ProgressBar, Skeleton
+│   │   │   ├── layout/               # Sidebar, MobileNav, SlicerBar
+│   │   │   ├── dashboard/            # StatCards, SpendingChart, etc.
+│   │   │   ├── transactions/         # TransactionTable
+│   │   │   ├── analytics/            # CategoryDonut, MonthlyTrends
+│   │   │   ├── budgets/              # BudgetCard, BudgetForm
+│   │   │   └── chat/                 # ChatPanel, FloatingWidget
+│   │   └── lib/
+│   │       ├── api.ts                # Centralized API client
+│   │       ├── types.ts              # TypeScript interfaces
+│   │       ├── constants.ts          # Categories, colors, nav items
+│   │       ├── utils.ts              # Formatting helpers
+│   │       └── FilterContext.tsx      # Global month/category slicer state
+│   └── ...
+│
+├── scripts/                          # ML pipeline scripts
+│   ├── generate_seeds.py             # Groq API → seed descriptions
+│   ├── simulator.py                  # Scales seeds → training data
+│   ├── train.py                      # Trains XGBoost + LogReg
+│   ├── evaluate.py                   # Three-way model comparison
+│   ├── categorize.py                 # Production categorization pipeline
+│   ├── chatbot.py                    # Standalone Ollama chatbot (CLI)
+│   └── test_models.py               # Interactive model testing
+│
+├── data/
+│   ├── seed_transactions.csv         # 1,252 LLM-generated seed descriptions
+│   ├── synthetic_transactions.csv    # 25 test transactions
+│   └── training_data.csv             # 100K simulated training records
 │
 ├── models/
-│   ├── train.py                  # (alternate location)
-│   └── saved/                    # trained model files (.pkl)
-│
-├── app/
-│   └── chatbot.py                # Streamlit conversational assistant
+│   └── saved/                        # Trained .pkl files (git-ignored)
 │
 └── output/
-    ├── categorized_transactions.csv
-    ├── evaluation_results.json
-    ├── evaluation_charts/        # comparison charts (PNG)
-    └── confusion_matrices/       # confusion matrix plots
+    ├── 100k/                         # Evaluation results (100K dataset)
+    │   ├── evaluation_results.json
+    │   └── evaluation_charts/        # Comparison charts (PNG)
+    └── 2M/                           # Evaluation results (2M dataset)
+        ├── evaluation_results.json
+        └── evaluation_charts/
 ```
 
 ---
@@ -74,11 +135,11 @@ finance-tracker/
 ### Prerequisites
 
 - Python 3.10+
-- Docker Desktop
-- Ollama
-- Power BI Desktop (optional, for dashboard)
+- Node.js 18+
+- Docker Desktop (for PostgreSQL)
+- Ollama (for AI chatbot)
 
-### 1. Clone and install dependencies
+### 1. Clone and install Python dependencies
 
 ```bash
 git clone https://github.com/YOUR_USERNAME/finance-tracker.git
@@ -91,30 +152,32 @@ pip install -r requirements.txt
 
 ### 2. Create `.env` file
 
-Create a file named `.env` in the project root:
+Copy the template and fill in your values:
 
-```
-GROQ_API_KEY=your-groq-api-key
-DB_HOST=localhost
-DB_NAME=postgres
-DB_USER=finance
-DB_PASSWORD=finance123
+```bash
+cp .env.example .env
 ```
 
-Get a free Groq API key at [console.groq.com](https://console.groq.com).
+Get a free Groq API key at [console.groq.com](https://console.groq.com) (only needed for seed generation).
 
 ### 3. Start PostgreSQL
 
 Make sure Docker Desktop is running, then:
 
 ```bash
-docker run -d --name finance-db -e POSTGRES_USER=finance -e POSTGRES_PASSWORD=finance123 -e POSTGRES_DB=transactions -p 5432:5432 postgres:16
+docker run -d \
+  --name finance-db \
+  -e POSTGRES_USER=finance \
+  -e POSTGRES_PASSWORD=finance123 \
+  -e POSTGRES_DB=postgres \
+  -p 5432:5432 \
+  postgres:16
 ```
 
-Create the table using DBeaver or any SQL client (connect to `localhost:5432`, database `postgres`, user `finance`, password `finance123`):
+Create the table using any SQL client (connect to `localhost:5432`):
 
 ```sql
-CREATE TABLE transactions (
+CREATE TABLE IF NOT EXISTS transactions (
     id SERIAL PRIMARY KEY,
     transaction_id VARCHAR(50) UNIQUE NOT NULL,
     date DATE NOT NULL,
@@ -126,166 +189,176 @@ CREATE TABLE transactions (
     confidence DECIMAL(3,2),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS budgets (
+    id SERIAL PRIMARY KEY,
+    month VARCHAR(7) NOT NULL,
+    category VARCHAR(50) NOT NULL,
+    amount DECIMAL(10,2) NOT NULL,
+    UNIQUE(month, category)
+);
 ```
 
 ### 4. Install Ollama
 
-Download from [ollama.com/download](https://ollama.com/download), install, restart your terminal, then:
+Download from [ollama.com/download](https://ollama.com/download), then:
 
 ```bash
 ollama pull llama3.1:8b
 ```
 
+### 5. Start the backend
+
+```bash
+python -m uvicorn backend.main:app --reload --port 8000
+```
+
+API available at `http://localhost:8000` — Swagger docs at `http://localhost:8000/docs`
+
+### 6. Start the frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+App available at `http://localhost:3000`
+
 ---
 
-## Pipeline — Step by Step
+## ML Pipeline
+
+These scripts are used to train and evaluate the ML models. The trained models are then used by the backend API for real-time transaction categorization.
 
 ### Step 1: Generate seed transactions
 
-Uses Groq API to create 1,252 diverse, realistic bank transaction descriptions across 8 categories.
+Uses Groq API (Llama 3.3 70B) to create 1,252 diverse, realistic bank transaction descriptions across 8 categories.
 
 ```bash
 python scripts/generate_seeds.py
 ```
-
-Output: `data/seed_transactions.csv`
 
 ### Step 2: Simulate training data
 
 Samples from seeds and applies mutations (store number swaps, location suffixes, capitalization changes, typos) to generate large-scale training data.
 
 ```bash
-# 100K records
 python scripts/simulator.py --records 100000
-
-# 2M records
 python scripts/simulator.py --records 2000000 --output data/large_training_data.csv
 ```
 
-Output: `data/training_data.csv`
-
 ### Step 3: Train models
 
-Trains XGBoost and Logistic Regression with TF-IDF features.
+Trains XGBoost and Logistic Regression with TF-IDF features (unigrams + bigrams, max 10K features).
 
 ```bash
-# Train on 100K
 python scripts/train.py --tag 100k
-
-# Train on 2M
 python scripts/train.py --data data/large_training_data.csv --tag 2m
 ```
 
-Output: `models/saved/*.pkl`
-
 ### Step 4: Evaluate models
 
-Three-way comparison: XGBoost vs Logistic Regression vs Ollama (prompt engineering). All evaluated on the same test set.
+Three-way comparison: XGBoost vs Logistic Regression vs Ollama. All evaluated on the same test set.
 
 ```bash
 python scripts/evaluate.py
 ```
 
-Output: `output/evaluation_results.json`, `output/evaluation_charts/`
+### Step 5: Categorize new transactions
 
-### Step 5: Categorize transactions
-
-Run the production pipeline on new transaction data. Uses the trained Logistic Regression model (no API needed).
+Production pipeline — categorizes CSV transactions using the trained Logistic Regression model and inserts into PostgreSQL.
 
 ```bash
 python scripts/categorize.py
 python scripts/categorize.py --input data/my_transactions.csv
-python scripts/categorize.py --no-db    # skip PostgreSQL
+python scripts/categorize.py --no-db    # skip database insert
 ```
 
-Output: `output/categorized_transactions.csv` + PostgreSQL insert
+---
 
-### Step 6: Launch chatbot
+## Web Application Features
 
-Interactive conversational assistant that queries PostgreSQL and uses Ollama for natural language responses.
+### Dashboard
+- Summary stats (total spent, transaction count, top category)
+- Spending trend area chart
+- Recent transactions list
+- Budget progress overview
 
-```bash
-streamlit run app/chatbot.py
-```
+### Transactions
+- Searchable, sortable transaction table
+- Pagination
+- Global month/year and category filters
 
-Opens at `http://localhost:8501`
+### Add Transaction
+- Manual entry form with auto-categorization (ML model predicts category on blur)
+- CSV drag-and-drop upload — accepts any bank CSV format (fuzzy header detection, multi-format date parsing, split debit/credit column support)
+
+### Analytics
+- Category breakdown donut chart
+- Monthly spending trends line chart
+- Detailed category-by-category table
+
+### Budgets
+- Set monthly budget limits per category
+- Visual progress bars with over-budget warnings
+- Filtered by global month slicer
+
+### AI Chatbot
+- Conversational assistant powered by Ollama (Llama 3.1 8B)
+- Has access to your real transaction and budget data
+- Ask questions like "How much did I spend on food?", "Am I over budget?", "Give me tips to save money"
+- Floating widget accessible from any page + dedicated full-page chat
 
 ---
 
 ## Data Pipeline
 
-### Seed Generation
+### Categories (8)
 
-- 1,252 seed transactions generated via Groq API (Llama 3.3 70B)
-- 8 categories: Food & Dining, Groceries, Transportation, Shopping, Entertainment, Health & Pharmacy, Utilities, Income
-- Each seed includes realistic messy bank description, category label, and amount range
+Food & Dining · Groceries · Transportation · Shopping · Entertainment · Health & Pharmacy · Utilities · Income
+
+### Seed Generation
+- 1,252 seeds generated via Groq API (Llama 3.3 70B)
+- Realistic messy bank descriptions with category labels and amount ranges
 
 ### Simulation
-
 - Three personas (student, professional, family) with different spending biases
-- Seasonal multipliers (more shopping in Nov/Dec, higher utilities in winter)
-- Weekend boosts (more food and entertainment spending)
-- Description mutations: store number swaps, location suffixes, capitalization changes, typos
+- Seasonal multipliers, weekend boosts, description mutations
 - 37,905 unique descriptions from 1,252 seeds (100K dataset)
 - 425,344 unique descriptions (2M dataset)
 
 ### Feature Engineering
-
-- TF-IDF vectorization with unigrams + bigrams
-- Max 10,000 features, min document frequency of 3
-- Sublinear TF scaling
-- Vocabulary size: ~5,400 features
+- TF-IDF vectorization: unigrams + bigrams, max 10K features, min df=3, sublinear TF
+- Vocabulary: ~5,400 features
 
 ---
 
 ## Model Details
 
 ### Logistic Regression (Best Performer)
-
-- Multinomial classification with L-BFGS solver
-- Why it wins: transaction categorization is a linear keyword-matching problem. "STARBUCKS" maps directly to Food & Dining — no complex feature interactions needed.
-- Training time: ~1 second
-- Inference: 0.0001ms per transaction
+- Multinomial with L-BFGS solver
+- Wins because transaction categorization is fundamentally a keyword-matching problem
+- Training: ~1 second | Inference: 0.0001ms/txn
 
 ### XGBoost
-
 - 200 estimators, max depth 6, learning rate 0.1
-- Slightly lower accuracy due to overfitting on noise (store numbers, location codes)
-- Training time: ~8 seconds (100K), ~2 minutes (2M)
-- Inference: 0.004ms per transaction
+- Slightly lower accuracy due to overfitting on noise
+- Training: ~8s (100K) | Inference: 0.004ms/txn
 
 ### Ollama / LLM Prompt Engineering
+- Llama 3.1 8B, zero-shot classification
+- Struggles with Groceries vs Shopping (0.73 F1), Utilities (0.78 F1)
+- Inference: 579ms/txn (5.8M times slower than LogReg)
 
-- Llama 3.1 8B running locally via Ollama
-- Zero-shot classification with structured prompting
-- Struggles with: Groceries vs Shopping (0.73 F1), Utilities (0.78 F1)
-- Inference: 579ms per transaction (5.8 million times slower than LogReg)
+### Scaling Analysis
 
-### Data Scaling Analysis
-
-| Dataset | LogReg Accuracy | XGBoost Accuracy | Improvement |
+| Dataset | LogReg | XGBoost | Improvement |
 |---|---|---|---|
 | 100K | 99.54% | 98.73% | — |
 | 2M | 99.74% | 99.10% | +0.20% / +0.37% |
 
-20x more data yielded less than 0.4% improvement, demonstrating that data quality (diverse seeds) matters more than data quantity.
-
----
-
-## Chatbot
-
-The Streamlit chatbot provides a conversational interface to query spending data:
-
-- Connects to PostgreSQL for live transaction data
-- Uses Ollama (Llama 3.1 8B) for natural language understanding
-- Context-aware: automatically fetches relevant data based on the question
-- Maintains conversation history for follow-up questions
-
-Sample questions:
-- "How much did I spend on food?"
-- "What are my top spending categories?"
-- "Give me tips to save money"
-- "How does this month compare to last month?"
+20x more data yielded <0.4% improvement — data quality (diverse seeds) matters more than quantity.
 
 ---
 
@@ -293,33 +366,13 @@ Sample questions:
 
 | Component | Technology | Purpose |
 |---|---|---|
-| ML Models | scikit-learn, XGBoost | Transaction categorization |
-| Feature Engineering | TF-IDF (scikit-learn) | Text to numeric features |
-| LLM (Evaluation) | Ollama / Llama 3.1 8B | Prompt engineering baseline |
-| LLM (Chatbot) | Ollama / Llama 3.1 8B | Conversational assistant |
+| Frontend | Next.js 16, TailwindCSS v4, Recharts | Web application UI |
+| Backend | FastAPI, asyncpg | REST API server |
+| ML Models | scikit-learn (TF-IDF + LogReg), XGBoost | Transaction categorization |
+| AI Chatbot | Ollama / Llama 3.1 8B | Conversational financial assistant |
 | Seed Generation | Groq API / Llama 3.3 70B | Generating training data seeds |
-| Database | PostgreSQL 16 (Docker) | Transaction storage |
-| Dashboard | Power BI | Spending visualizations |
-| Chatbot UI | Streamlit | Web interface |
-| Containerization | Docker | PostgreSQL deployment |
-
----
-
-## Requirements
-
-```
-python-dotenv
-requests
-psycopg2-binary
-scikit-learn
-xgboost
-pandas
-matplotlib
-seaborn
-joblib
-streamlit
-plotly
-```
+| Database | PostgreSQL 16 (Docker) | Transaction & budget storage |
+| Data Fetching | SWR | Client-side caching & revalidation |
 
 ---
 

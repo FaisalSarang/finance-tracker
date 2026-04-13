@@ -1,19 +1,52 @@
-# environment
-.env
+# ── Python ──────────────────────────────────────
 venv/
 __pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
 
-# models (too large for git)
+# ── Node / Next.js ─────────────────────────────
+node_modules/
+.next/
+out/
+.pnp.*
+.yarn/*
+
+# ── Environment & Secrets ──────────────────────
+.env
+.env.*
+!.env.example
+frontend/.env.local
+
+# ── ML models (too large for git) ──────────────
 models/saved/*.pkl
 
-# generated data (too large)
+# ── Large generated data ───────────────────────
 data/large_training_data.csv
 data/scale_test.csv
 
-# output caches
+# ── Output caches ──────────────────────────────
 output/ollama_cache_*.json
 output/categorized_transactions.csv
 
-# misc
-*.pyc
+# ── IDE / Editor ───────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ── Claude Code config ─────────────────────────
+.claude/
+
+# ── OS files ───────────────────────────────────
 .DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Misc ───────────────────────────────────────
+*.log
+npm-debug.log*
+yarn-debug.log*
